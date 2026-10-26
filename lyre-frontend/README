@@ -1,0 +1,28 @@
+📖 Lyre — Plateforme de Lecture & Streaming de LivresLyre est une application web moderne et responsive dédiée à la lecture et au streaming d'œuvres littéraires. Conçue avec une interface utilisateur fluide, élégante et adaptable (mode sombre/clair), elle offre une expérience de lecture immersive sur tous les écrans (desktop, tablette et mobile).✨ Fonctionnalités Principales📚 Catalogue de Livres : Parcours et recherche d'œuvres littéraires.📖 Lecteur Intégré : Interface de lecture épurée optimisée pour le confort visuel.👤 Espace Profil / Compte : Gestion des informations utilisateur, statistiques de lecture et historique.🌓 Thème Sombre / Clair : Basculement fluide entre mode sombre et mode clair.📱 Design Fully Responsive : Navigation adaptative avec menu mobile (hamburger) optimisé pour les smartphones.🎨 Identité Visuelle Moderne : Palette de couleurs signée Lyre (#2563eb Bleu Principal, #06b6d4 Cyan Accent) avec effets glow.🛠️ Tech StackFrontendFramework / Librairie : ReactOutil de Build : ViteRoutage : React Router DOMIcônes : Lucide ReactStyling : CSS3 moderne (Flexbox, Grid, Media Queries, Variables CSS)Backend / Base de DonnéesAPI : PHP / Node.js (selon votre configuration)Base de Données : MySQL (support de stockage long-texte pour les œuvres complètes)🚀 Installation & LancementPrérequisNode.js (version 16+ recommandée)npm ou yarn1. Cloner le projetgit clone https://github.com/votre-compte/lyre.git
+cd lyre
+2. Installer les dépendancesnpm install
+3. Lancer l'environnement de développementnpm run dev
+L'application sera accessible sur http://localhost:5173 (ou le port indiqué par Vite).📁 Structure du Projetlyre/
+├── public/
+│   ├── favicon.png         # Favicon du site
+│   └── logo.png            # Logo officiel Lyre
+├── src/
+│   ├── components/
+│   │   ├── Navbar.jsx      # Barre de navigation responsive
+│   │   └── ...
+│   ├── pages/
+│   │   ├── Home.jsx        # Page d'accueil
+│   │   ├── Catalog.jsx     # Catalogue de livres
+│   │   ├── Account.jsx     # Espace profil utilisateur
+│   │   └── Reader.jsx      # Interface de lecture
+│   ├── App.jsx             # Composant racine & routage
+│   ├── index.css           # Styles globaux & variables de thème
+│   └── main.jsx            # Point d'entrée React
+├── index.html              # Fichier HTML principal (Vite)
+├── package.json
+└── README.md
+🎨 Charte GraphiqueÉlémentCouleurCode HexBleu PrincipalBleu Électrique#2563ebCyan AccentCyan Lumineux#06b6d4Fond SombreDark Slate#0f172aFond ClairBlanc / Off-White#ffffff
+
+📄 Licence
+
+Ce projet est sous licence MIT. Libre à vous de l'utiliser et de le modifier.
