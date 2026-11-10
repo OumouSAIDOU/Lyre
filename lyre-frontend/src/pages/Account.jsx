@@ -144,9 +144,7 @@ export default function Account() {
           'Votre mot de passe ne respecte pas les critères de sécurité.'
         );
       } else {
-        setError(
-          "Une erreur est survenue. Vérifiez vos informations et réessayez."
-        );
+        setError(err?.message || "Erreur lors de l'inscription.");
       }
     } finally {
       setSubmitting(false);
