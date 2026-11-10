@@ -29,6 +29,7 @@ export default function Reader() {
   const [showSettings, setShowSettings] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isMarked, setIsMarked] = useState(false);
+  const [savingRead, setSavingRead] = useState(false);
 
   // ==========================================
   // 1. CHARGER LE LIVRE DEPUIS SUPABASE
@@ -146,19 +147,82 @@ export default function Reader() {
   // 4. MARQUER UN LIVRE COMME LU
   // ==========================================
 
-  const handleMarkAsRead = () => {
-    /*
-      Cette fonctionnalité sera connectée à Supabase
-      après la mise en place de Supabase Auth.
+  // Vérifier si ce livre figure déjà dans l'historique du compte connecté.
+  useEffect(() => {
+    let cancelled = false;
 
-      Nous ne devons pas utiliser un user_id provenant
-      directement du localStorage pour modifier les
-      données d'un utilisateur.
-    */
+    async function checkReadStatus() {
+      setIsMarked(false);
+      if (!book) return;
 
-    alert(
-      "Le suivi des livres lus sera disponible après la connexion des comptes à Supabase."
-    );
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) return;
+
+        const { data, error: readError } = await supabase
+          .from('user_reads')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('book_id', book.id)
+          .limit(1);
+
+        if (readError) throw readError;
+        if (!cancelled) setIsMarked((data || []).length > 0);
+      } catch (err) {
+        console.error('Erreur vérification de lecture :', err);
+      }
+    }
+
+    checkReadStatus();
+    return () => { cancelled = true; };
+  }, [book]);
+
+  const handleMarkAsRead = async () => {
+    if (!book || isMarked || savingRead) return;
+    setSavingRead(true);
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        alert('Connectez-vous dans Espace Personnel pour enregistrer votre lecture.');
+        return;
+      }
+
+      // Éviter d'ajouter plusieurs fois le même livre à l'historique.
+      const { data: existing, error: checkError } = await supabase
+        .from('user_reads')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('book_id', book.id)
+        .limit(1);
+
+      if (checkError) throw checkError;
+      if (existing && existing.length > 0) {
+        setIsMarked(true);
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from('user_reads')
+        .insert({ user_id: user.id, book_id: book.id });
+
+      if (insertError) {
+        // Si une contrainte unique empêche un doublon créé simultanément.
+        if (insertError.code === '23505') {
+          setIsMarked(true);
+          return;
+        }
+        throw insertError;
+      }
+
+      setIsMarked(true);
+      alert('🎉 Livre marqué comme lu !');
+    } catch (err) {
+      console.error('Erreur enregistrement lecture :', err);
+      alert("Impossible d'enregistrer cette lecture. Réessayez.");
+    } finally {
+      setSavingRead(false);
+    }
   };
 
   // ==========================================
@@ -255,6 +319,7 @@ export default function Reader() {
               isMarked ? 'marked' : ''
             }`}
             onClick={handleMarkAsRead}
+            disabled={savingRead || isMarked}
             title="Marquer comme lu"
             style={{
               color: isMarked ? '#10b981' : 'inherit'
@@ -263,7 +328,7 @@ export default function Reader() {
             <CheckCircle size={18} />
 
             <span className="hide-mobile">
-              {isMarked ? 'Lu' : 'Terminer'}
+              {isMarked ? 'Lu' : savingRead ? 'Enregistrement...' : 'Terminer'}
             </span>
           </button>
 
