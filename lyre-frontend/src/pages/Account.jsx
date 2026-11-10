@@ -21,6 +21,8 @@ export default function Account() {
 
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -70,7 +72,111 @@ export default function Account() {
   }, []);
 
   // ==========================================
-  // 2. CONNEXION ET INSCRIPTION
+  // 2. CHARGER L'HISTORIQUE DE LECTURE
+  // ==========================================
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      if (!user?.id) {
+        setHistory([]);
+        setHistoryLoading(false);
+        setHistoryError('');
+        return;
+      }
+
+      setHistoryLoading(true);
+      setHistoryError('');
+      setHistory([]);
+
+      try {
+        // Récupérer les livres lus par l'utilisateur connecté
+        const { data: reads, error: readsError } = await supabase
+          .from('user_reads')
+          .select('book_id, read_at')
+          .eq('user_id', user.id)
+          .order('read_at', { ascending: false });
+
+        if (readsError) {
+          throw readsError;
+        }
+
+        // Éviter d'afficher plusieurs fois le même livre
+        const uniqueReads = (reads || []).filter(
+          (read, index, all) =>
+            all.findIndex(
+              (item) => item.book_id === read.book_id
+            ) === index
+        );
+
+        const bookIds = uniqueReads.map(
+          (read) => read.book_id
+        );
+
+        let books = [];
+
+        // Récupérer les titres et les auteurs
+        if (bookIds.length > 0) {
+          const {
+            data,
+            error: booksError
+          } = await supabase
+            .from('books')
+            .select('id, title, author')
+            .in('id', bookIds);
+
+          if (booksError) {
+            throw booksError;
+          }
+
+          books = data || [];
+        }
+
+        const booksById = new Map(
+          books.map((book) => [
+            String(book.id),
+            book
+          ])
+        );
+
+        if (active) {
+          setHistory(
+            uniqueReads.map((read) => ({
+              ...read,
+              book:
+                booksById.get(String(read.book_id)) ||
+                null
+            }))
+          );
+        }
+      } catch (err) {
+        console.error(
+          'Erreur historique de lecture :',
+          err
+        );
+
+        if (active) {
+          setHistoryError(
+            "Impossible de charger votre historique de lecture."
+          );
+        }
+      } finally {
+        if (active) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  // ==========================================
+  // 3. CONNEXION ET INSCRIPTION
   // ==========================================
 
   const handleSubmit = async (e) => {
@@ -127,24 +233,40 @@ export default function Account() {
             'Vérifiez votre boîte e-mail pour confirmer votre inscription.'
           );
         } else {
-          setMessage('Votre compte a été créé avec succès !');
+          setMessage(
+            'Votre compte a été créé avec succès !'
+          );
         }
       }
     } catch (err) {
-      console.error('Erreur authentification :', err);
+      console.error(
+        'Erreur authentification :',
+        err
+      );
 
-      if (err.message === 'Invalid login credentials') {
-        setError('Adresse e-mail ou mot de passe incorrect.');
-      } else if (err.message === 'Email not confirmed') {
+      if (
+        err.message === 'Invalid login credentials'
+      ) {
+        setError(
+          'Adresse e-mail ou mot de passe incorrect.'
+        );
+      } else if (
+        err.message === 'Email not confirmed'
+      ) {
         setError(
           'Veuillez confirmer votre adresse e-mail avant de vous connecter.'
         );
-      } else if (err.message?.includes('Password should be')) {
+      } else if (
+        err.message?.includes('Password should be')
+      ) {
         setError(
           'Votre mot de passe ne respecte pas les critères de sécurité.'
         );
       } else {
-        setError(err?.message || "Erreur lors de l'inscription.");
+        setError(
+          err?.message ||
+          "Erreur lors de l'inscription."
+        );
       }
     } finally {
       setSubmitting(false);
@@ -152,7 +274,7 @@ export default function Account() {
   };
 
   // ==========================================
-  // 3. DÉCONNEXION
+  // 4. DÉCONNEXION
   // ==========================================
 
   const handleLogout = async () => {
@@ -163,7 +285,9 @@ export default function Account() {
       await supabase.auth.signOut();
 
     if (logoutError) {
-      setError('Impossible de vous déconnecter.');
+      setError(
+        'Impossible de vous déconnecter.'
+      );
       return;
     }
 
@@ -172,21 +296,23 @@ export default function Account() {
   };
 
   // ==========================================
-  // 4. CHARGEMENT
+  // 5. CHARGEMENT
   // ==========================================
 
   if (loading) {
     return (
       <div className="page-container account-container">
         <div className="account-card-modern">
-          <p>Chargement de votre espace personnel...</p>
+          <p>
+            Chargement de votre espace personnel...
+          </p>
         </div>
       </div>
     );
   }
 
   // ==========================================
-  // 5. ESPACE PERSONNEL
+  // 6. ESPACE PERSONNEL
   // ==========================================
 
   if (user) {
@@ -237,7 +363,11 @@ export default function Account() {
                   display: 'block'
                 }}
               >
-                —
+                {historyLoading
+                  ? '…'
+                  : historyError
+                    ? '—'
+                    : history.length}
               </span>
 
               <span className="stat-lab">
@@ -266,28 +396,102 @@ export default function Account() {
               Mon Historique de Lecture
             </h3>
 
-            <div
-              className="empty-history"
-              style={{
-                padding: '1.5rem',
-                textAlign: 'center',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: '8px'
-              }}
-            >
+            {historyLoading ? (
               <p>
-                Le suivi des livres lus sera activé
-                après la configuration des historiques
-                dans Supabase.
+                Chargement de votre historique...
               </p>
-            </div>
+            ) : historyError ? (
+              <p role="alert">
+                {historyError}
+              </p>
+            ) : history.length === 0 ? (
+              <div
+                className="empty-history"
+                style={{
+                  padding: '1.5rem',
+                  textAlign: 'center',
+                  background:
+                    'rgba(255,255,255,0.03)',
+                  borderRadius: '8px'
+                }}
+              >
+                <p>
+                  Vous n'avez pas encore marqué
+                  de livre comme lu.
+                </p>
+              </div>
+            ) : (
+              <div className="account-reading-history">
+
+                {history.map((read) => (
+                  <div
+                    key={read.book_id}
+                    className="account-history-item"
+                    style={{
+                      padding: '1rem',
+                      marginBottom: '0.75rem',
+                      background:
+                        'rgba(255,255,255,0.03)',
+                      borderRadius: '8px'
+                    }}
+                  >
+
+                    {read.book ? (
+                      <Link
+                        to={`/read/${read.book_id}`}
+                        style={{
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        {read.book.title}
+                      </Link>
+                    ) : (
+                      <strong>
+                        Livre indisponible
+                      </strong>
+                    )}
+
+                    {read.book?.author && (
+                      <p
+                        style={{
+                          margin: '0.4rem 0'
+                        }}
+                      >
+                        Par {read.book.author}
+                      </p>
+                    )}
+
+                    {read.read_at && (
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Calendar size={14} />
+
+                        Lu le{' '}
+                        {new Date(
+                          read.read_at
+                        ).toLocaleDateString('fr-FR')}
+                      </span>
+                    )}
+
+                  </div>
+                ))}
+
+              </div>
+            )}
           </div>
 
           {error && (
             <div
               className="auth-alert error"
               role="alert"
-              style={{ marginTop: '1rem' }}
+              style={{
+                marginTop: '1rem'
+              }}
             >
               {error}
             </div>
@@ -296,7 +500,9 @@ export default function Account() {
           {/* Actions */}
           <div
             className="account-actions"
-            style={{ marginTop: '2rem' }}
+            style={{
+              marginTop: '2rem'
+            }}
           >
             <Link
               to="/catalog"
@@ -337,7 +543,7 @@ export default function Account() {
   }
 
   // ==========================================
-  // 6. FORMULAIRE DE CONNEXION / INSCRIPTION
+  // 7. FORMULAIRE CONNEXION / INSCRIPTION
   // ==========================================
 
   return (
@@ -346,12 +552,15 @@ export default function Account() {
       <div className="account-card-modern">
 
         <div className="account-header">
+
           <span className="section-subtitle">
             ESPACE MEMBRE
           </span>
 
           <h2>
-            {isLoginMode ? 'Connexion' : 'Créer un compte'}
+            {isLoginMode
+              ? 'Connexion'
+              : 'Créer un compte'}
           </h2>
 
           <p>
@@ -359,10 +568,14 @@ export default function Account() {
               ? 'Accédez à votre bibliothèque personnelle.'
               : 'Rejoignez la plateforme Lyre dès maintenant.'}
           </p>
+
         </div>
 
         {error && (
-          <div className="auth-alert error" role="alert">
+          <div
+            className="auth-alert error"
+            role="alert"
+          >
             {error}
           </div>
         )}
@@ -388,11 +601,13 @@ export default function Account() {
           {/* Nom */}
           {!isLoginMode && (
             <div className="input-group">
+
               <label htmlFor="account-name">
                 Nom complet
               </label>
 
               <div className="input-field-wrapper">
+
                 <User
                   size={18}
                   className="input-icon"
@@ -403,20 +618,25 @@ export default function Account() {
                   type="text"
                   placeholder="Votre nom"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) =>
+                    setName(e.target.value)
+                  }
                   required
                 />
+
               </div>
             </div>
           )}
 
           {/* Email */}
           <div className="input-group">
+
             <label htmlFor="account-email">
               Adresse e-mail
             </label>
 
             <div className="input-field-wrapper">
+
               <Mail
                 size={18}
                 className="input-icon"
@@ -427,19 +647,24 @@ export default function Account() {
                 type="email"
                 placeholder="votre@email.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
                 required
               />
+
             </div>
           </div>
 
           {/* Mot de passe */}
           <div className="input-group">
+
             <label htmlFor="account-password">
               Mot de passe
             </label>
 
             <div className="input-field-wrapper">
+
               <Lock
                 size={18}
                 className="input-icon"
@@ -450,7 +675,9 @@ export default function Account() {
                 type="password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
                 required
                 minLength={6}
                 autoComplete={
@@ -459,6 +686,7 @@ export default function Account() {
                     : 'new-password'
                 }
               />
+
             </div>
           </div>
 
@@ -473,12 +701,15 @@ export default function Account() {
                 ? 'Se connecter'
                 : "S'inscrire"}
 
-            {!submitting && <ArrowRight size={16} />}
+            {!submitting && (
+              <ArrowRight size={16} />
+            )}
           </button>
 
         </form>
 
         <div className="auth-switch-prompt">
+
           <p>
             {isLoginMode
               ? 'Pas encore de compte ?'
@@ -501,6 +732,7 @@ export default function Account() {
                 : 'Se connecter'}
             </button>
           </p>
+
         </div>
 
       </div>
